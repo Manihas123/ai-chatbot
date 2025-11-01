@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🤖 Jimmy AI Chatbot</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+  body {
+  margin: 0;
+  background: #111;
+  color: #fff;
+  font-family: "Inter", sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+.chat-container {
+  width: 90%;
+  max-width: 800px;
+  height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: #1e1e1e;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 0 20px rgba(0,0,0,0.5);
+}
+
+.chat-header {
+  background: #0b93f6;
+  text-align: center;
+  padding: 15px;
+  font-weight: bold;
+  font-size: 1.2rem;
+}
+
+.chat-area {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.user-message, .bot-message {
+  display: flex;
+  width: 100%;
+}
+
+.user-bubble, .bot-bubble {
+  padding: 10px 14px;
+  border-radius: 15px;
+  max-width: 75%;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.user-message {
+  justify-content: flex-end;
+}
+
+.user-bubble {
+  background: #0b93f6;
+  color: white;
+}
+
+.bot-message {
+  justify-content: flex-start;
+}
+
+.bot-bubble {
+  background: #333;
+}
+
+.chat-input-area {
+  display: flex;
+  padding: 10px;
+  border-top: 1px solid #444;
+  background: #1e1e1e;
+}
+
+textarea {
+  flex: 1;
+  resize: none;
+  padding: 10px;
+  border: none;
+  outline: none;
+  background: #2a2a2a;
+  color: white;
+  border-radius: 10px;
+  font-size: 1rem;
+}
+
+button {
+  background: #0b93f6;
+  border: none;
+  padding: 10px 16px;
+  margin-left: 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  color: white;
+  font-weight: bold;
+}
+
+button:hover {
+  background: #0078e7;
+}
+</style>
+</head>
+<body>
+  <div class="chat-container">
+    <div class="chat-header">🤖 Jimmy AI</div>
+    <div id="chatArea" class="chat-area"></div>
+    <div class="chat-input-area">
+      <textarea id="userInput" placeholder="Type your message..."></textarea>
+      <button onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+
+  <script>
+  const chatArea = document.getElementById("chatArea");
+  const userInput = document.getElementById("userInput");
+
+  function appendMessage(content, sender) {
+    const msg = document.createElement("div");
+    msg.classList.add(sender === "user" ? "user-message" : "bot-message");
+    msg.innerHTML = content;
+    chatArea.appendChild(msg);
+    chatArea.scrollTop = chatArea.scrollHeight;
+  }
+
+  async function sendMessage() {
+    const message = userInput.value.trim();
+    if (!message) return;
+
+    appendMessage(`<div class="bubble user-bubble">${message}</div>`, "user");
+    userInput.value = "";
+
+    const botMsg = document.createElement("div");
+    botMsg.classList.add("bot-message");
+    botMsg.innerHTML = `<div class="bubble bot-bubble"><span id="typing">...</span></div>`;
+    chatArea.appendChild(botMsg);
+
+    const msgContent = botMsg.querySelector(".bubble");
+    const typing = botMsg.querySelector("#typing");
+
+    const response = await fetch("/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message }),
+    });
+
+    if (!response.body) {
+      msgContent.textContent = "⚠️ Connection error.";
+      return;
+    }
+
+    typing.remove();
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    let done = false;
+    while (!done) {
+      const { value, done: readerDone } = await reader.read();
+      done = readerDone;
+      if (value) {
+        const chunk = decoder.decode(value, { stream: true });
+        const parts = chunk.split("data: ").filter(Boolean);
+        for (const part of parts) {
+          msgContent.textContent += part.replace(/\n\n/g, "");
+          chatArea.scrollTop = chatArea.scrollHeight;
+        }
+      }
+    }
+  }
+  </script>
+</body>
+</html>
